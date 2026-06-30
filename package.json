@@ -4,7 +4,7 @@
   "author": "Shadcnblocks.com",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+  "dev": "set NODE_OPTIONS=--max-http-header-size=65536 && next dev",
     "build": "next build",
     "start": "next start",
     "format": "prettier --check .",

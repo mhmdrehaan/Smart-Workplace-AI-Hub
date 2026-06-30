@@ -9,16 +9,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { labels } from "../data/data"
 import { Task, taskSchema } from "../data/schema"
 import { TasksDetailDialog } from "./tasks-detail-dialog"
 import { TasksMutateDrawer } from "./tasks-mutate-drawer"
@@ -57,24 +51,6 @@ export function DataTableRowActions({ row }: Props) {
             <DropdownMenuItem onClick={() => setOpen("edit")}>
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem>Make a copy</DropdownMenuItem>
-            <DropdownMenuItem>Favorite</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Labels</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup value={task.label}>
-                  {labels.map((label) => (
-                    <DropdownMenuRadioItem
-                      key={label.value}
-                      value={label.value}
-                    >
-                      {label.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               Delete

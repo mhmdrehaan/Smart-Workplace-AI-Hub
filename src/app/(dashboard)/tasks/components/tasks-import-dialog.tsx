@@ -24,15 +24,31 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 
+// 🟢 FIX: Membungkus FileList ke z.any() dengan pengecekan runtime window agar aman dari crash SSR
 const formSchema = z.object({
   file: z
-    .instanceof(FileList)
-    .refine((files) => files.length > 0, {
-      message: "Please upload a file",
-    })
+    .any()
     .refine(
-      (files) => ["text/csv"].includes(files?.[0]?.type),
-      "Please upload csv format."
+      (files) => {
+        if (typeof window !== "undefined" && files instanceof FileList) {
+          return files.length > 0
+        }
+        return true
+      },
+      { message: "Please upload a file" }
+    )
+    .refine(
+      (files) => {
+        if (
+          typeof window !== "undefined" &&
+          files instanceof FileList &&
+          files[0]
+        ) {
+          return ["text/csv"].includes(files?.[0]?.type)
+        }
+        return true
+      },
+      { message: "Please upload csv format." }
     ),
 })
 

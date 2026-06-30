@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { TasksImportDialog } from "./tasks-import-dialog"
 import { TasksMutateDrawer } from "./tasks-mutate-drawer"
 
-export function TasksPrimaryActions() {
+// 🟢 FIX: Ditambahkan keyword 'default' di depan function
+export default function TasksPrimaryActions() {
   const [open, setOpen] = useState(false)
   const [openImport, setOpenImport] = useState(false)
   return (

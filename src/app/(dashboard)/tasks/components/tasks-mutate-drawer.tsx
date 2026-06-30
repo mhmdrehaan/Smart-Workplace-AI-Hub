@@ -4,6 +4,7 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/sheet"
 import SelectDropdown from "@/components/select-dropdown"
 import { Task } from "../data/schema"
+import { createClient } from "@/lib/supabase"
 
 interface Props {
   open: boolean
@@ -35,39 +37,93 @@ interface Props {
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required."),
+  description: z.string().optional(),
   status: z.string().min(1, "Please select a status."),
-  label: z.enum(["documentation", "bug", "feature"], {
-    required_error: "Please select a label.",
-  }),
-  priority: z.string().min(1, "Please choose a priority."),
+  
+  // 🟢 FIX: Mengizinkan string kosong "" agar tidak memicu eror UUID saat dikosongkan
+  assignee_id: z.string().uuid("Invalid uuid").optional().or(z.literal("")),
+  due_date: z.string().optional(),
+  workspace_id: z.string().uuid("Invalid uuid").optional().or(z.literal("")),
 })
+
+
 type TasksForm = z.infer<typeof formSchema>
 
 export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
   const isUpdate = !!currentRow
+  const router = useRouter()
+  const supabase = createClient()
 
-  const form = useForm<TasksForm>({
-    resolver: zodResolver(formSchema),
-    defaultValues: currentRow ?? {
-      title: "",
-      status: "",
-      label: undefined,
-      priority: "",
-    },
-  })
+ const form = useForm<TasksForm>({
+  resolver: zodResolver(formSchema),
+  defaultValues: {
+    title: currentRow?.title ?? "",
+    description: currentRow?.description ?? "",
+    status: currentRow?.status ?? "",
+    assignee_id: currentRow?.assignee_id ?? "",
+    due_date: currentRow?.due_date ?? "",
+    workspace_id: currentRow?.workspace_id ?? "",
+  },
+})
 
-  const onSubmit = (data: TasksForm) => {
-    // do something with the form data
-    onOpenChange(false)
-    form.reset()
-    toast({
-      title: "You submitted the following values:",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
+  const onSubmit = async (data: TasksForm) => {
+    try {
+      if (isUpdate && currentRow) {
+        // Update existing task
+        const { error } = await supabase
+          .from("tasks")
+          .update({
+            title: data.title,
+            description: data.description || null,
+            status: data.status,
+            assignee_id: data.assignee_id || null,
+            due_date: data.due_date || null,
+            workspace_id: data.workspace_id || null,
+          })
+          .eq("id", currentRow.id)
+
+        if (error) {
+          throw error
+        }
+
+      toast({
+      title: isUpdate ? "Task updated" : "Task created",
+      description: isUpdate 
+        ? "Task has been updated successfully." 
+        : "New task has been created successfully.",
     })
+      } else {
+        // Create new task
+        const { error } = await supabase.from("tasks").insert({
+          title: data.title,
+          description: data.description || null,
+          status: data.status,
+          assignee_id: data.assignee_id || null,
+          due_date: data.due_date || null,
+          workspace_id: data.workspace_id || null,
+        })
+
+        if (error) {
+          throw error
+        }
+
+        toast({
+          title: "Task created",
+          description: "New task has been created successfully.",
+        })
+      }
+
+      onOpenChange(false)
+      form.reset()
+      router.refresh()
+    } catch (error) {
+      console.error("Error saving task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save task. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -118,11 +174,10 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
                     onValueChange={field.onChange}
                     placeholder="Select dropdown"
                     items={[
-                      { label: "In Progress", value: "in progress" },
-                      { label: "Backlog", value: "backlog" },
-                      { label: "Todo", value: "todo" },
-                      { label: "Canceled", value: "canceled" },
-                      { label: "Done", value: "done" },
+                      { label: "Backlog", value: "Backlog" },
+                      { label: "Todo", value: "Todo" },
+                      { label: "In Progress", value: "In Progress" },
+                      { label: "Done", value: "Done" },
                     ]}
                   />
                   <FormMessage />
@@ -131,37 +186,12 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
             />
             <FormField
               control={form.control}
-              name="label"
+              name="description"
               render={({ field }) => (
-                <FormItem className="relative space-y-3">
-                  <FormLabel>Label</FormLabel>
+                <FormItem className="space-y-1">
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="documentation" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          Documentation
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="feature" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Feature</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="bug" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Bug</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
+                    <Input {...field} placeholder="Enter a description" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -169,35 +199,38 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
             />
             <FormField
               control={form.control}
-              name="priority"
+              name="assignee_id"
               render={({ field }) => (
-                <FormItem className="relative space-y-3">
-                  <FormLabel>Priority</FormLabel>
+                <FormItem className="space-y-1">
+                  <FormLabel>Assignee ID</FormLabel>
                   <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="high" />
-                        </FormControl>
-                        <FormLabel className="font-normal">High</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="medium" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Medium</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-y-0 space-x-3">
-                        <FormControl>
-                          <RadioGroupItem value="low" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Low</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
+                    <Input {...field} placeholder="Enter assignee ID" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="due_date"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel>Due Date</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="date" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="workspace_id"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel>Workspace ID</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Enter workspace ID" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
