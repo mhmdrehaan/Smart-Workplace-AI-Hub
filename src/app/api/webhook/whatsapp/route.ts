@@ -25,27 +25,31 @@ function getClients() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message } = body;
+    // Menyesuaikan payload dari WhatsApp Gateway (Fonnte/Whacenter)
+    const messageText = body?.message || "";
+    const senderNumber = body?.sender || "";
 
-    if (!message || typeof message !== "string") {
+    if (!messageText || typeof messageText !== "string") {
       return NextResponse.json(
         { error: "Message is required and must be a string" },
         { status: 400 }
       );
     }
 
+    console.log(`[WA AGENT] Pesan masuk dari ${senderNumber}: "${messageText}"`);
+
     const { supabase, genAI } = getClients();
 
-    // Embedding — model sama dengan upload route
+    // 1. Embedding — Mengikuti model andalan lu yang sudah terbukti works
     const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-    const embeddingResult = await embeddingModel.embedContent(message);
+    const embeddingResult = await embeddingModel.embedContent(messageText);
     const embeddingVector = embeddingResult.embedding?.values;
 
     if (!embeddingVector || embeddingVector.length === 0) {
       throw new Error("Gagal generate embedding vector");
     }
 
-    // Vector search di Supabase
+    // 2. Vector search di Supabase
     const { data: documents, error: matchError } = await supabase.rpc(
       "match_documents",
       {
@@ -70,40 +74,49 @@ export async function POST(req: NextRequest) {
             .join("\n\n---\n\n")
         : "Tidak ada informasi relevan di database.";
 
-    // Generate jawaban dengan menyisipkan instruksi tersembunyi untuk deteksi task
+    // 3. Generate jawaban dengan kombinasi Instruksi Khusus (Otonom Task)
     const chatModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
-    const prompt = `Anda adalah asisten AI cerdas untuk Workplace Hub. Jawab pertanyaan berdasarkan konteks berikut:\n\n${contextText}\n\n` +
-      `[INSTRUKSI KHUSUS]:\n` +
-      `Jika user meminta Anda untuk membuat, menjadwalkan, atau menambahkan TUGAS/TASK baru (misal: "tolong bikinin tugas...", "jadwalkan rapat...", "bikin jadwal..."), berikan respons teks biasa seperti biasa, TETAPI di baris paling bawah jawaban Anda, wajib tambahkan teks format JSON kaku seperti ini:\n` +
-      `|||{"create_task": true, "task_title": "Judul Tugas Singkat", "task_desc": "Deskripsi detail tugas"}|||\n\n` +
-      `Pertanyaan: ${message}\n\nJawaban:`;
+    const prompt = `
+      Anda adalah asisten AI cerdas untuk Workplace Hub yang membalas chat otomatis via WhatsApp. 
+      Jawab pertanyaan berdasarkan konteks berikut:
 
+      ${contextText}
+
+      [INSTRUKSI KHUSUS]:
+      Jika user meminta Anda untuk membuat, menjadwalkan, atau menambahkan TUGAS/TASK baru (misal: "tolong bikinin tugas...", "jadwalkan rapat...", "bikin jadwal..."), berikan respons teks biasa seperti biasa, TETAPI di baris paling bawah jawaban Anda, wajib tambahkan teks format JSON kaku seperti ini:
+      |||{"create_task": true, "task_title": "Judul Tugas Singkat", "task_desc": "Deskripsi detail tugas"}|||
+
+      Pertanyaan: ${messageText}
+      Jawaban:
+    `;
+    
     const chatResult = await chatModel.generateContent(prompt);
-    let reply = chatResult.response.text();
+    let aiReply = chatResult.response.text();
+    console.log(`[WA AGENT] Raw Respons AI: ${aiReply}`);
 
-    // ==== PROSES OTOMATISASI WRITE-BACK KE TABEL TASKS SUPABASE ====
-    if (reply.includes("|||")) {
-      const parts = reply.split("|||");
-      reply = parts[0].trim(); // Bersihkan text chat utama agar JSON rahasianya tidak bocor ke UI
+    // 4. DETEKSI & PARSING TRIGGER UTK AUTO-INSERT KE TABEL TASKS
+    if (aiReply.includes("|||")) {
+      const parts = aiReply.split("|||");
+      aiReply = parts[0].trim(); // Bersihkan teks chat agar rapi saat dibaca di WhatsApp
       
       try {
         const jsonMetadata = JSON.parse(parts[1].trim());
         if (jsonMetadata.create_task) {
-          console.log(`[AI AGENT] Mendeteksi request pembuatan task otonom: ${jsonMetadata.task_title}`);
+          console.log(`[WA AGENT] Menjalankan Aksi Pembuatan Task Otonom: ${jsonMetadata.task_title}`);
           
-          // Insert langsung ke tabel tasks milik lu
+          // Insert langsung ke tabel tasks Supabase milik lu
           const { error: insertError } = await supabase
             .from("tasks")
             .insert([
               {
                 title: jsonMetadata.task_title,
-                description: `${jsonMetadata.task_desc} (Dibuat otomatis via Smart Chat Panel)`
+                description: `${jsonMetadata.task_desc} (Dibuat otomatis oleh AI Agent via WhatsApp)`
               }
             ]);
           
           if (!insertError) {
-            reply += `\n\n✅ *Sistem Update:* Tugas "${jsonMetadata.task_title}" telah berhasil otomatis dibuat di dashboard Smart Workplace Anda!`;
+            aiReply += `\n\n✅ *Sistem Update:* Tugas "${jsonMetadata.task_title}" telah berhasil otomatis dibuat di dashboard Smart Workplace Anda!`;
           } else {
             console.error("[SUPABASE INSERT ERROR]:", insertError);
           }
@@ -113,7 +126,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ reply });
+    console.log(`[WA AGENT] Final Reply Terkirim: ${aiReply}`);
+
+    // Return format JSON untuk pengetesan di Postman
+    return NextResponse.json({ reply: aiReply }, { status: 200 });
+
   } catch (error: any) {
     console.error("Chat API Error:", {
       message: error.message,
