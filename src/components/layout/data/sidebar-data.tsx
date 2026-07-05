@@ -85,24 +85,24 @@ export const sidebarData: SidebarData = {
     {
       title: "Pages",
       items: [
-        {
-          title: "Auth",
-          icon: IconLockAccess,
-          items: [
-            {
-              title: "Login",
-              url: "/login",
-            },
-            {
-              title: "Register",
-              url: "/register",
-            },
-            {
-              title: "Forgot Password",
-              url: "/forgot-password",
-            },
-          ],
-        },
+        // {
+        //   title: "Auth",
+        //   icon: IconLockAccess,
+        //   items: [
+        //     {
+        //       title: "Login",
+        //       url: "/login",
+        //     },
+        //     {
+        //       title: "Register",
+        //       url: "/register",
+        //     },
+        //     {
+        //       title: "Forgot Password",
+        //       url: "/forgot-password",
+        //     },
+        //   ],
+        // },
         {
           title: "Errors",
           icon: IconBug,

@@ -8,6 +8,7 @@ import {
   LogOut,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -35,6 +36,16 @@ interface Props {
 
 export function NavUser({ user }: Props) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    // Call the signOut server action via a form submission
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = '/auth/signout'
+    document.body.appendChild(form)
+    form.submit()
+  }
 
   return (
     <SidebarMenu>
@@ -96,7 +107,7 @@ export function NavUser({ user }: Props) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
               <LogOut />
               Log out
             </DropdownMenuItem>

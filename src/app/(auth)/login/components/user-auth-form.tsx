@@ -6,12 +6,9 @@ import { useForm } from "react-hook-form"
 import { IconBrandFacebook, IconBrandGithub } from "@tabler/icons-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
-import { nofitySubmittedValues } from "@/lib/notify-submitted-values"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
+import { signIn } from "@/app/auth/actions"
 import {
   Form,
   FormControl,
@@ -39,10 +36,9 @@ const formSchema = z.object({
 })
 
 export function UserAuthForm() {
-  const router = useRouter()
-  const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("") 
+  const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,22 +51,21 @@ export function UserAuthForm() {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
     setErrorMessage("")
+    setSuccessMessage("")
     
-    // 1. Eksekusi Login Supabase
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
+    const formData = new FormData()
+    formData.append("email", data.email)
+    formData.append("password", data.password)
     
-    if (error) {
+    const result = await signIn(formData)
+    
+    if (result?.error) {
       setIsLoading(false)
-      setErrorMessage(error.message) 
+      setErrorMessage(result.error)
       return
     }
     
-    // 2. Jika berhasil, router redirect ke root (dashboard 1)
-    router.push("/")
-    router.refresh() 
+    // Success - the server action handles redirect
   }
 
   return (
@@ -107,6 +102,11 @@ export function UserAuthForm() {
           {errorMessage && (
             <div className="text-sm text-red-500 font-medium">
               {errorMessage}
+            </div>
+          )}
+          {successMessage && (
+            <div className="text-sm text-green-500 font-medium">
+              {successMessage}
             </div>
           )}
           

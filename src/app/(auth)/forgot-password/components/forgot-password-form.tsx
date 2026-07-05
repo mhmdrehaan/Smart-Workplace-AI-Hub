@@ -4,9 +4,9 @@ import { HTMLAttributes, useState } from "react"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { nofitySubmittedValues } from "@/lib/notify-submitted-values"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { resetPassword } from "@/app/auth/actions"
 import {
   Form,
   FormControl,
@@ -29,19 +29,34 @@ export function ForgotPasswordForm({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "" },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    nofitySubmittedValues(data)
-
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 3000)
+    setErrorMessage("")
+    setSuccessMessage("")
+    
+    const formData = new FormData()
+    formData.append("email", data.email)
+    
+    const result = await resetPassword(formData)
+    
+    setIsLoading(false)
+    
+    if (result?.error) {
+      setErrorMessage(result.error)
+      return
+    }
+    
+    if (result?.success) {
+      setSuccessMessage(result.message)
+    }
   }
 
   return (
@@ -63,8 +78,18 @@ export function ForgotPasswordForm({
               )}
             />
             <Button className="mt-2" disabled={isLoading}>
-              Continue
+              {isLoading ? "Sending..." : "Continue"}
             </Button>
+            {errorMessage && (
+              <div className="text-sm text-red-500 font-medium">
+                {errorMessage}
+              </div>
+            )}
+            {successMessage && (
+              <div className="text-sm text-green-500 font-medium">
+                {successMessage}
+              </div>
+            )}
           </div>
         </form>
       </Form>

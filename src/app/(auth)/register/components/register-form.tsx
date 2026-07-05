@@ -2,14 +2,12 @@
 
 import { HTMLAttributes, useState } from "react"
 import { z } from "zod"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
 import { useForm } from "react-hook-form"
 import { IconBrandFacebook, IconBrandGithub } from "@tabler/icons-react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { nofitySubmittedValues } from "@/lib/notify-submitted-values"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { signUp } from "@/app/auth/actions"
 import {
   Form,
   FormControl,
@@ -43,10 +41,9 @@ const formSchema = z
   })
 
 export function RegisterForm() {
-  const router = useRouter()
-  const supabase = createClient()
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -59,19 +56,27 @@ export function RegisterForm() {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
     setErrorMessage("")
-    // 1. Eksekusi Sign Up Supabase
-    const { error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-    })
-    if (error) {
+    setSuccessMessage("")
+    
+    const formData = new FormData()
+    formData.append("email", data.email)
+    formData.append("password", data.password)
+    
+    const result = await signUp(formData)
+    
+    if (result?.error) {
       setIsLoading(false)
-      setErrorMessage(error.message)
+      setErrorMessage(result.error)
       return
     }
-    // 2. Redirect ke dashboard (root) jika sukses register
-    router.push("/")
-    router.refresh()
+    
+    if (result?.success) {
+      setSuccessMessage(result.message)
+      setIsLoading(false)
+      return
+    }
+    
+    // Success - the server action handles redirect
   }
 
   return (
@@ -121,6 +126,11 @@ export function RegisterForm() {
           {errorMessage && (
             <div className="text-sm text-red-500 font-medium">
               {errorMessage}
+            </div>
+          )}
+          {successMessage && (
+            <div className="text-sm text-green-500 font-medium">
+              {successMessage}
             </div>
           )}
           

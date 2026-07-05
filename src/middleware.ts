@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  // ✅ Bypass webhook SEBELUM logic Supabase apa pun dijalankan
+  // 1. Bypass webhook SEBELUM logic Supabase apa pun dijalankan
   if (request.nextUrl.pathname.startsWith("/api/webhook")) {
     return NextResponse.next()
   }
@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({
@@ -38,19 +38,25 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isAuthPage =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/register")
+  const currentPath = request.nextUrl.pathname
 
-  if (!user && !isAuthPage) {
+  // Cek apakah halaman yang diakses adalah halaman login/register/forgot
+  const isAuthPage =
+    currentPath.startsWith("/login") ||
+    currentPath.startsWith("/register") ||
+    currentPath.startsWith("/forgot-password")
+
+  // JIKA USER BELUM LOGIN & mencoba buka halaman dashboard internal, tendang ke /login
+  if (!user && !isAuthPage && currentPath !== "/") {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
+  // JIKA USER SUDAH LOGIN & mencoba buka halaman /login atau /register, lempar langsung ke analytics dashboard
   if (user && isAuthPage) {
     const url = request.nextUrl.clone()
-    url.pathname = "/"
+    url.pathname = "/chat" // Mengarah ke rute dashboard utama lu
     return NextResponse.redirect(url)
   }
 
