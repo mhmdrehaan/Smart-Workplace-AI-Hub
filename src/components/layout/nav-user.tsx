@@ -8,7 +8,7 @@ import {
   LogOut,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useTransition } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { signOut } from "@/app/auth/actions"
 
 interface Props {
   user: {
@@ -34,17 +35,25 @@ interface Props {
   }
 }
 
+/** Returns up to 2 uppercase initials from a display name or email prefix */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
+
 export function NavUser({ user }: Props) {
   const { isMobile } = useSidebar()
-  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
-  const handleSignOut = async () => {
-    // Call the signOut server action via a form submission
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = '/auth/signout'
-    document.body.appendChild(form)
-    form.submit()
+  const initials = getInitials(user.name || user.email.split("@")[0] || "U")
+
+  const handleSignOut = () => {
+    startTransition(async () => {
+      await signOut()
+    })
   }
 
   return (
@@ -58,7 +67,9 @@ export function NavUser({ user }: Props) {
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
@@ -77,7 +88,9 @@ export function NavUser({ user }: Props) {
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">SN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{user.name}</span>
@@ -90,7 +103,7 @@ export function NavUser({ user }: Props) {
               <DropdownMenuItem asChild>
                 <Link href="/settings/profile">
                   <BadgeCheck />
-                  Profile
+                  Profile Settings
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -107,9 +120,13 @@ export function NavUser({ user }: Props) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut />
-              Log out
+            <DropdownMenuItem
+              onClick={handleSignOut}
+              disabled={isPending}
+              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+            >
+              <LogOut className="text-destructive" />
+              {isPending ? "Signing out…" : "Sign Out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

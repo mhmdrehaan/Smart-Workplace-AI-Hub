@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -12,24 +11,16 @@ import { NavGroup } from "@/components/layout/nav-group"
 import { NavUser } from "@/components/layout/nav-user"
 import { TeamSwitcher } from "@/components/layout/team-switcher"
 import { sidebarData } from "./data/sidebar-data"
-import { createClient } from "@/lib/supabase"
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [user, setUser] = useState(sidebarData.user)
-  const supabase = createClient()
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user: {
+    name: string
+    email: string
+    avatar: string
+  }
+}
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
-      if (authUser) {
-        setUser({
-          name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
-          email: authUser.email || "",
-          avatar: authUser.user_metadata?.avatar_url || "/avatars/avatar-1.png",
-        })
-      }
-    })
-  }, [])
-
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
   return (
     <div className="relative">
       <Sidebar collapsible="icon" {...props}>
@@ -37,8 +28,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <TeamSwitcher teams={sidebarData.teams} />
         </SidebarHeader>
         <SidebarContent>
-          {sidebarData.navGroups.map((props) => (
-            <NavGroup key={props.title} {...props} />
+          {sidebarData.navGroups.map((group) => (
+            <NavGroup key={group.title} {...group} />
           ))}
         </SidebarContent>
         <SidebarFooter>
