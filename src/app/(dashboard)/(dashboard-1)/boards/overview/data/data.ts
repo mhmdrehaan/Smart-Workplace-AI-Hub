@@ -1,79 +1,109 @@
 import { ForwardRefExoticComponent, RefAttributes } from "react"
-import {
-  Icon,
-  IconGift,
-  IconMenuOrder,
-  IconProps,
-  IconSubscript,
-} from "@tabler/icons-react"
+import { Icon, IconProps } from "@tabler/icons-react"
 
-export const dashboard2Stats: Dashboard2Stats[] = [
-  {
-    label: "New Subscriptions",
-    description: "Total number of new subscriptions",
-    stats: 4682,
-    type: "up",
-    percentage: 15.54,
-    chartData: [
-      { month: "Monday", value: 200 },
-      { month: "Tuesday", value: 305 },
-      { month: "Webnesday", value: 237 },
-      { month: "Thursday", value: 73 },
-      { month: "Friday", value: 209 },
-      { month: "Saturday", value: 10 },
-      { month: "Sunday", value: 214 },
-    ],
-    strokeColor: "var(--chart-1)",
-    icon: IconSubscript,
-  },
-  {
-    label: "New Orders",
-    description: "Total number of new orders",
-    stats: 1226,
-    type: "down",
-    percentage: 40.2,
-    chartData: [
-      { month: "Monday", value: 186 },
-      { month: "Tuesday", value: 305 },
-      { month: "Webnesday", value: 237 },
-      { month: "Thursday", value: 73 },
-      { month: "Friday", value: 209 },
-      { month: "Saturday", value: 214 },
-      { month: "Sunday", value: 214 },
-    ],
-    strokeColor: "var(--chart-2)",
-    icon: IconMenuOrder,
-  },
-  {
-    label: "Avg Order Revenue",
-    description: "Average order of revenue",
-    stats: 1080,
-    type: "up",
-    percentage: 10.8,
-    chartData: [
-      { month: "Monday", value: 50 },
-      { month: "Tuesday", value: 125 },
-      { month: "Webnesday", value: 240 },
-      { month: "Thursday", value: 93 },
-      { month: "Friday", value: 209 },
-      { month: "Saturday", value: 150 },
-      { month: "Sunday", value: 300 },
-    ],
-    strokeColor: "#6366f1",
-    icon: IconGift,
-  },
-]
+// ─── Webhook Log row shape (mirrors the Supabase table) ──────────────────────
+export type WebhookLog = {
+  id: string
+  webhook_source: string
+  status_code: number
+  status: "success" | "failed" | "pending"
+  error_message: string | null
+  created_at: string
+}
 
-export type Dashboard2Stats = {
+// ─── Stat card props ──────────────────────────────────────────────────────────
+export type AutomationStat = {
   label: string
   description: string
-  stats: number
-  type: "up" | "down"
+  /** Displayed value — can be a number string or a formatted % string */
+  value: string
+  type: "up" | "down" | "neutral"
   percentage: number
-  chartData: {
-    [x: string]: PropertyKey
-    value: number
-  }[]
+  chartData: { day: string; value: number }[]
   strokeColor: string
   icon: ForwardRefExoticComponent<IconProps & RefAttributes<Icon>>
 }
+
+// ─── Fallback sample data (used when the DB table doesn't exist yet) ──────────
+export const fallbackWebhookLogs: WebhookLog[] = [
+  {
+    id: "wh-001",
+    webhook_source: "n8n",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-002",
+    webhook_source: "zapier",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-003",
+    webhook_source: "make",
+    status_code: 422,
+    status: "failed",
+    error_message: "Unprocessable entity – missing required field",
+    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-004",
+    webhook_source: "n8n",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-005",
+    webhook_source: "zapier",
+    status_code: 500,
+    status: "failed",
+    error_message: "Internal server error",
+    created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-006",
+    webhook_source: "custom",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-007",
+    webhook_source: "make",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-008",
+    webhook_source: "n8n",
+    status_code: 404,
+    status: "failed",
+    error_message: "Endpoint not found",
+    created_at: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-009",
+    webhook_source: "zapier",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "wh-010",
+    webhook_source: "custom",
+    status_code: 200,
+    status: "success",
+    error_message: null,
+    created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+  },
+]

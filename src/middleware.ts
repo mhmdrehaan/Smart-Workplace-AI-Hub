@@ -46,8 +46,9 @@ export async function middleware(request: NextRequest) {
     currentPath.startsWith("/register") ||
     currentPath.startsWith("/forgot-password")
 
-  // JIKA USER BELUM LOGIN & mencoba buka halaman dashboard internal, tendang ke /login
-  if (!user && !isAuthPage && currentPath !== "/") {
+  // JIKA USER BELUM LOGIN & mencoba buka halaman apa pun yang bukan auth page, tendang ke /login
+  // Ini juga mencakup root path "/" — tidak ada pengecualian lagi karena page.tsx sudah dihapus
+  if (!user && !isAuthPage) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
@@ -56,7 +57,7 @@ export async function middleware(request: NextRequest) {
   // JIKA USER SUDAH LOGIN & mencoba buka halaman /login atau /register, lempar langsung ke analytics dashboard
   if (user && isAuthPage) {
     const url = request.nextUrl.clone()
-    url.pathname = "/chat" // Mengarah ke rute dashboard utama lu
+    url.pathname = "/" // Mengarah ke rute dashboard utama lu
     return NextResponse.redirect(url)
   }
 
