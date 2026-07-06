@@ -1,5 +1,4 @@
-import { ForwardRefExoticComponent, RefAttributes } from "react"
-import { Icon, IconProps } from "@tabler/icons-react"
+
 
 // ─── Webhook Log row shape (mirrors the Supabase table) ──────────────────────
 export type WebhookLog = {
@@ -12,6 +11,8 @@ export type WebhookLog = {
 }
 
 // ─── Stat card props ──────────────────────────────────────────────────────────
+// NOTE: no `icon` field — React component functions cannot be serialized
+// across the Server→Client boundary. Icons are resolved inside stats.tsx.
 export type AutomationStat = {
   label: string
   description: string
@@ -21,7 +22,6 @@ export type AutomationStat = {
   percentage: number
   chartData: { day: string; value: number }[]
   strokeColor: string
-  icon: ForwardRefExoticComponent<IconProps & RefAttributes<Icon>>
 }
 
 // ─── Fallback sample data (used when the DB table doesn't exist yet) ──────────

@@ -1,9 +1,14 @@
 "use client"
 
+import * as React from "react"
 import {
+  IconActivity,
+  IconAlertTriangle,
   IconCaretDownFilled,
   IconCaretUpFilled,
+  IconCheck,
   IconInfoCircle,
+  IconWebhook,
 } from "@tabler/icons-react"
 import { Line, LineChart } from "recharts"
 import { cn } from "@/lib/utils"
@@ -15,31 +20,44 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Dashboard2Stats, dashboard2Stats } from "../data/data"
+import { AutomationStat } from "../data/data"
 
-export default function Stats() {
+// Icons resolved locally — React component functions cannot be serialized
+// as props across the server→client boundary.
+const ICON_MAP: Record<string, React.ElementType> = {
+  "Total Webhooks":   IconWebhook,
+  "Successful Tasks": IconCheck,
+  "Success Rate":     IconActivity,
+  "Failed Incidents": IconAlertTriangle,
+}
+
+interface Props {
+  stats: AutomationStat[]
+}
+
+export default function Stats({ stats }: Props) {
   return (
     <>
-      {dashboard2Stats.map((stats) => (
-        <StatsCard key={stats.label} {...stats} />
+      {stats.map((s) => (
+        <StatCard key={s.label} {...s} />
       ))}
     </>
   )
 }
 
-function StatsCard({
+function StatCard({
   label,
   description,
-  stats,
+  value,
   type,
   percentage,
   chartData,
   strokeColor,
-  icon: Icon,
-}: Dashboard2Stats) {
+}: AutomationStat) {
+  const Icon = ICON_MAP[label] ?? IconWebhook
   const chartConfig = {
-    month: {
-      label: "month",
+    value: {
+      label: label,
       color: strokeColor,
     },
   } satisfies ChartConfig
@@ -66,20 +84,20 @@ function StatsCard({
       <CardContent className="flex h-[calc(100%_-_48px)] flex-col justify-between py-4">
         <div className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="text-3xl font-bold">{stats.toLocaleString('en-US')}</div>
+            <div className="text-3xl font-bold">{value}</div>
             <ChartContainer className="w-[70px]" config={chartConfig}>
               <LineChart accessibilityLayer data={chartData}>
                 <Line
                   dataKey="value"
                   type="linear"
-                  stroke="var(--color-month)"
+                  stroke="var(--color-value)"
                   strokeWidth={1.5}
                   dot={false}
                 />
               </LineChart>
             </ChartContainer>
           </div>
-          <p className="text-muted-foreground text-xs">Since Last week</p>
+          <p className="text-muted-foreground text-xs">Since last week</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-5">
@@ -88,16 +106,17 @@ function StatsCard({
             className={cn("flex items-center gap-1", {
               "text-emerald-500 dark:text-emerald-400": type === "up",
               "text-red-500 dark:text-red-400": type === "down",
+              "text-muted-foreground": type === "neutral",
             })}
           >
-            <p className={"text-[13px] leading-none font-medium"}>
-              {percentage.toLocaleString('en-US')}%
+            <p className="text-[13px] leading-none font-medium">
+              {percentage.toLocaleString("en-US")}%
             </p>
             {type === "up" ? (
               <IconCaretUpFilled size={18} />
-            ) : (
-              <IconCaretDownFilled />
-            )}
+            ) : type === "down" ? (
+              <IconCaretDownFilled size={18} />
+            ) : null}
           </div>
         </div>
       </CardContent>

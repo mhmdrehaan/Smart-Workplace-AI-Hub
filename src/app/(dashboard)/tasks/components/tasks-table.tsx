@@ -104,9 +104,9 @@ export function TasksTable({ columns, data }: Props) {
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-24 text-center text-muted-foreground"
                 >
-                  No results.
+                  No automated tasks found. Tell the AI Agent in &apos;AI Workplace Chat&apos; to create a schedule or task for you.
                 </TableCell>
               </TableRow>
             )}

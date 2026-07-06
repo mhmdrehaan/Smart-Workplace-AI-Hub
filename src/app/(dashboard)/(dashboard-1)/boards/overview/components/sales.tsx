@@ -21,33 +21,28 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-]
+interface Props {
+  chartData: { day: string; success: number; failed: number }[]
+}
 
 const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--chart-1)",
-  },
-  mobile: {
-    label: "Mobile",
+  success: {
+    label: "Successful",
     color: "var(--chart-2)",
+  },
+  failed: {
+    label: "Failed",
+    color: "var(--destructive)",
   },
 } satisfies ChartConfig
 
-export default function Sales() {
+export default function RequestVolume({ chartData }: Props) {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Sale Activity - Monthly</CardTitle>
+        <CardTitle>Request Volume — Last 7 Days</CardTitle>
         <CardDescription>
-          Showing total sales for the last 6 months
+          Webhook call volume grouped by day (success vs failed)
         </CardDescription>
       </CardHeader>
       <CardContent className="h-[calc(100%_-_90px)]">
@@ -56,60 +51,56 @@ export default function Sales() {
             <AreaChart
               accessibilityLayer
               data={chartData}
-              margin={{
-                left: 12,
-                right: 12,
-              }}
+              margin={{ left: 12, right: 12 }}
             >
               <CartesianGrid vertical={false} />
               <XAxis
-                dataKey="month"
+                dataKey="day"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) => value.slice(0, 3)}
               />
               <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
               <defs>
-                <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="fillSuccess" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
-                    stopColor="var(--color-desktop)"
+                    stopColor="var(--color-success)"
                     stopOpacity={0.8}
                   />
                   <stop
                     offset="95%"
-                    stopColor="var(--color-desktop)"
+                    stopColor="var(--color-success)"
                     stopOpacity={0.1}
                   />
                 </linearGradient>
-                <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="fillFailed" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
-                    stopColor="var(--color-mobile)"
+                    stopColor="var(--color-failed)"
                     stopOpacity={0.8}
                   />
                   <stop
                     offset="95%"
-                    stopColor="var(--color-mobile)"
+                    stopColor="var(--color-failed)"
                     stopOpacity={0.1}
                   />
                 </linearGradient>
               </defs>
               <Area
-                dataKey="mobile"
+                dataKey="failed"
                 type="natural"
-                fill="url(#fillMobile)"
+                fill="url(#fillFailed)"
                 fillOpacity={0.4}
-                stroke="var(--color-mobile)"
+                stroke="var(--color-failed)"
                 stackId="a"
               />
               <Area
-                dataKey="desktop"
+                dataKey="success"
                 type="natural"
-                fill="url(#fillDesktop)"
+                fill="url(#fillSuccess)"
                 fillOpacity={0.4}
-                stroke="var(--color-desktop)"
+                stroke="var(--color-success)"
                 stackId="a"
               />
             </AreaChart>

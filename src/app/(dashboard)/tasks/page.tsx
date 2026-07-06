@@ -36,9 +36,9 @@ export default async function TasksPage() {
     <>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Tasks</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Agent Tasks</h2>
           <p className="text-muted-foreground">
-            Here&apos;s a list of your tasks for this month!
+            Tasks automatically generated, tracked, and managed by your AI Workspace Chat agents.
           </p>
         </div>
         <TasksPrimaryActions />

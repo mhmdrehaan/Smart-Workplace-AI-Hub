@@ -20,7 +20,7 @@ export function DataTableToolbar<TData>({
       <div className="flex flex-1 items-center space-x-2">
         {/* Input untuk pencarian berdasarkan Title Task */}
         <Input
-          placeholder="Filter tasks..."
+          placeholder="Search agent tasks..."
           value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("title")?.setFilterValue(event.target.value)
