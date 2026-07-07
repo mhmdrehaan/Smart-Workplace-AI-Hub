@@ -40,7 +40,7 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/(dashboard1)", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg.content }),
