@@ -13,4 +13,9 @@ Manage and store all workspace documents in one place, ready to power the AI cha
 ### 📊 Dashboard Workspace Analytics
 Track workspace performance and activity through a clean, real-time analytics dashboard.
 
-![Dashboard Analytics Demo](src/app/assets/workplaces.gif)
+![Dashboard Analytics Demo](src/app/assets/dashboard.gif)
+
+### ⚡ Agent Task Automation
+Automatically generate and track tasks straight from your AI chat conversations — no manual entry needed.
+
+![Agent Automation Demo](src/app/assets/agentautomations.gif)
