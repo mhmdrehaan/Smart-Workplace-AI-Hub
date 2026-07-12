@@ -334,7 +334,9 @@ export async function POST(req: NextRequest) {
           {
             title,
             description: `${description} (Dibuat otomatis via Smart Chat Panel)`,
-            user_id: user.id, // WAJIB: scoping kepemilikan
+            assignee_id: user.id,  // FK → auth.users.id (tidak ada kolom user_id)
+            status: "Todo",        // Harus cocok dengan nilai di UI: "Todo" | "In Progress" | "Done" | "Backlog"
+            workspace_id: null,    // nullable per skema, tidak ada workspace aktif dari context ini
           },
         ]);
 

@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Send, Bot, User, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase";
 
 type Message = {
   role: "user" | "assistant";
@@ -40,9 +41,20 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
+      // Attach the Supabase session token so the server's
+      // getAuthenticatedUser() can verify the caller's identity.
+      // Without this header the server always sees the user as a guest.
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
         body: JSON.stringify({ message: userMsg.content }),
       });
 

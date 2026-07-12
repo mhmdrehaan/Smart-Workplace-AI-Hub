@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card"
 import { UserAuthForm } from "./components/user-auth-form"
+import Link from "next/link"
 
 export default function LoginPage() {
   return (
@@ -28,6 +29,15 @@ export default function LoginPage() {
           Privacy Policy
         </a>
         .
+      </p>
+      <p className="text-muted-foreground mt-4 px-8 text-center text-sm">
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/register"
+          className="hover:text-primary underline underline-offset-4 font-medium"
+        >
+          Register
+        </Link>
       </p>
     </Card>
   )
