@@ -1,27 +1,16 @@
-# Shadcnblocks.com - Admin Kit
+## Demo
 
-A premium Shadcn admin dashboard by shadcnblocks.com
+### 💬 AI Workplace Chat
+Chat with an AI that understands your workspace's document context — get context-aware answers and even create tasks automatically through natural conversation.
 
-## Getting Started
+![AI Chat Demo](src/app/assets/AiChat.gif)
 
-Install dependencies
+### 📚 Knowledge Base
+Manage and store all workspace documents in one place, ready to power the AI chat's answers.
 
-```bash
-pnpm install
-```
+![Knowledge Base Demo](src/app/assets/KnowledgeBase.gif)
 
-Start the server
+### 📊 Dashboard Workspace Analytics
+Track workspace performance and activity through a clean, real-time analytics dashboard.
 
-```bash
-pnpm run dev
-```
-
-## Tech Stack
-
-- shadcn/ui
-- TailwindCSS v4
-- Next.js
-- React 19
-- TypeScript
-- Eslint v9
-- Prettier
+![Dashboard Analytics Demo](src/app/assets/workplaces.gif)
