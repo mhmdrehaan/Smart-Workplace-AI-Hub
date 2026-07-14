@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -12,9 +13,31 @@ import { createClient } from "@/lib/supabase";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  /** Set to true when this bubble confirms a task that was just created. */
+  isTaskConfirmation?: boolean;
 };
 
+/**
+ * Renders a plain string with **text** markers converted to <strong> elements
+ * so task confirmations display with proper bold formatting in the chat bubble.
+ */
+function RichText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i}>{part.slice(2, -2)}</strong>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 export default function ChatPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -61,10 +84,22 @@ export default function ChatPage() {
       const data = await res.json();
       
       if (res.ok) {
+        const isTaskConfirmation = !!data.taskCreated;
+
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: data.reply || data.response || "..." },
+          {
+            role: "assistant",
+            content: data.reply || data.response || "...",
+            isTaskConfirmation,
+          },
         ]);
+
+        // Auto-refresh the task table if a task was just created by the AI
+        if (isTaskConfirmation) {
+          // Small delay so the confirmation bubble renders before the table refresh
+          setTimeout(() => router.refresh(), 300);
+        }
       } else {
         setMessages((prev) => [
           ...prev,
@@ -104,10 +139,17 @@ export default function ChatPage() {
                   className={`rounded-lg px-4 py-2 max-w-[80%] ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      : msg.isTaskConfirmation
+                        ? "bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800"
+                        : "bg-muted"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                  <p className="whitespace-pre-wrap text-sm">
+                    {msg.isTaskConfirmation
+                      ? <RichText text={msg.content} />
+                      : msg.content
+                    }
+                  </p>
                 </div>
                 {msg.role === "user" && (
                   <Avatar className="h-8 w-8 border bg-primary/10">

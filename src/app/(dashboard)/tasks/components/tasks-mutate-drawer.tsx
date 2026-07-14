@@ -39,13 +39,20 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required."),
   description: z.string().optional(),
   status: z.string().min(1, "Please select a status."),
-  
-  // 🟢 FIX: Mengizinkan string kosong "" agar tidak memicu eror UUID saat dikosongkan
+
+  // 🟢 FIX: Allow empty string "" so UUID validation isn't triggered when empty
   assignee_id: z.string().uuid("Invalid uuid").optional().or(z.literal("")),
   due_date: z.string().optional(),
   workspace_id: z.string().uuid("Invalid uuid").optional().or(z.literal("")),
-})
 
+  // WhatsApp notification fields — optional, used only on task creation
+  assignee_name: z.string().optional(),
+  assignee_phone: z
+    .string()
+    .regex(/^\d*$/, "Phone must contain digits only (e.g. 6283804064832)")
+    .optional()
+    .or(z.literal("")),
+})
 
 type TasksForm = z.infer<typeof formSchema>
 
@@ -54,62 +61,73 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
- const form = useForm<TasksForm>({
-  resolver: zodResolver(formSchema),
-  defaultValues: {
-    title: currentRow?.title ?? "",
-    description: currentRow?.description ?? "",
-    status: currentRow?.status ?? "",
-    assignee_id: currentRow?.assignee_id ?? "",
-    due_date: currentRow?.due_date ?? "",
-    workspace_id: currentRow?.workspace_id ?? "",
-  },
-})
+  const form = useForm<TasksForm>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title:          currentRow?.title          ?? "",
+      description:    currentRow?.description    ?? "",
+      status:         currentRow?.status         ?? "",
+      assignee_id:    currentRow?.assignee_id    ?? "",
+      due_date:       currentRow?.due_date       ?? "",
+      workspace_id:   currentRow?.workspace_id   ?? "",
+      assignee_name:  "",
+      assignee_phone: "",
+    },
+  })
 
   const onSubmit = async (data: TasksForm) => {
     try {
       if (isUpdate && currentRow) {
-        // Update existing task
+        // ── Update existing task (direct Supabase, no WA notification) ──────
         const { error } = await supabase
           .from("tasks")
           .update({
-            title: data.title,
-            description: data.description || null,
-            status: data.status,
-            assignee_id: data.assignee_id || null,
-            due_date: data.due_date || null,
+            title:        data.title,
+            description:  data.description  || null,
+            status:       data.status,
+            assignee_id:  data.assignee_id  || null,
+            due_date:     data.due_date     || null,
             workspace_id: data.workspace_id || null,
           })
           .eq("id", currentRow.id)
 
-        if (error) {
-          throw error
-        }
-
-      toast({
-      title: isUpdate ? "Task updated" : "Task created",
-      description: isUpdate 
-        ? "Task has been updated successfully." 
-        : "New task has been created successfully.",
-    })
-      } else {
-        // Create new task
-        const { error } = await supabase.from("tasks").insert({
-          title: data.title,
-          description: data.description || null,
-          status: data.status,
-          assignee_id: data.assignee_id || null,
-          due_date: data.due_date || null,
-          workspace_id: data.workspace_id || null,
-        })
-
-        if (error) {
-          throw error
-        }
+        if (error) throw error
 
         toast({
+          title: "Task updated",
+          description: "Task has been updated successfully.",
+        })
+      } else {
+        // ── Create new task via API route (triggers WhatsApp notification) ──
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title:          data.title,
+            description:    data.description     || null,
+            status:         data.status,
+            assignee_id:    data.assignee_id     || null,
+            due_date:       data.due_date        || null,
+            workspace_id:   data.workspace_id    || null,
+            // WhatsApp fields — server ignores them if blank
+            assignee_name:  data.assignee_name   || null,
+            assignee_phone: data.assignee_phone  || null,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result?.error ?? "Failed to create task.")
+        }
+
+        // Show different toast depending on whether WA was triggered
+        const waTriggered = !!data.assignee_phone
+        toast({
           title: "Task created",
-          description: "New task has been created successfully.",
+          description: waTriggered
+            ? "New task created. WhatsApp notification sent to assignee."
+            : "New task has been created successfully.",
         })
       }
 
@@ -120,7 +138,10 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
       console.error("Error saving task:", error)
       toast({
         title: "Error",
-        description: "Failed to save task. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to save task. Please try again.",
         variant: "destructive",
       })
     }
@@ -148,7 +169,7 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
           <form
             id="tasks-form"
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex-1 space-y-5"
+            className="flex-1 space-y-5 overflow-y-auto pr-1"
           >
             <FormField
               control={form.control}
@@ -236,7 +257,58 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
                 </FormItem>
               )}
             />
+
+            {/* ── WhatsApp Notification Section (create only) ── */}
+            {!isUpdate && (
+              <>
+                <div className="relative my-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      WhatsApp Notification (optional)
+                    </span>
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="assignee_name"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel>Assignee Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. Rehaan" />
+                      </FormControl>
+                      <p className="text-[0.75rem] text-muted-foreground">
+                        Name shown in the WhatsApp message greeting.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assignee_phone"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel>WhatsApp Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 6283804064832" />
+                      </FormControl>
+                      <p className="text-[0.75rem] text-muted-foreground">
+                        Digits only, country code included. Leave blank to skip.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
           </form>
+
         </Form>
         <SheetFooter className="gap-2">
           <SheetClose asChild>

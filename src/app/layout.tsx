@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "Shadcnblocks - Admin Kit",
+  title: "Smart Workplace",
   description: "Shadcnblocks - Admin Kit built with NextJS",
 }
 

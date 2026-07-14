@@ -2,11 +2,13 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  // 1. Bypass webhook SEBELUM logic Supabase apa pun dijalankan
-  if (request.nextUrl.pathname.startsWith("/api/webhook")) {
-    return NextResponse.next()
-  }
-
+// 1. Bypass webhook dan internal API tasks SEBELUM logic Supabase apa pun dijalankan
+if (
+  request.nextUrl.pathname.startsWith("/api/webhook") ||
+  request.nextUrl.pathname.startsWith("/api/tasks")
+) {
+  return NextResponse.next()
+}
   let supabaseResponse = NextResponse.next({
     request,
   })

@@ -149,27 +149,122 @@ function isAggregationQuery(message: string): boolean {
   return AGGREGATION_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
-// Definisi tool buat Gemini function calling.
+// ─── Task Confirmation Reply Builder ─────────────────────────────────────────
+//
+// Produces a friendly, human-like assistant message after a task is created.
+// Kept out of the main handler so it is easy to adjust copy independently.
+
+interface TaskReplyOptions {
+  taskName: string;
+  deadline: string | null;      // YYYY-MM-DD or empty
+  assigneeName: string | null;
+  assigneePhone: string | null;
+  success: boolean;
+  httpStatus?: number;          // Only relevant when success=false
+}
+
+/**
+ * Formats a YYYY-MM-DD string into a human-readable locale date.
+ * Falls back to the raw string if parsing fails.
+ */
+function formatDeadline(raw: string | null): string {
+  if (!raw) return "tanpa tenggat waktu";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("id-ID", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function buildTaskReply(opts: TaskReplyOptions): string {
+  const { taskName, deadline, assigneeName, assigneePhone, success, httpStatus } = opts;
+  const deadlineStr = formatDeadline(deadline);
+
+  // ── Failure cases ────────────────────────────────────────────────────────
+  if (!success) {
+    return (
+      `Maaf, saya tidak berhasil menyimpan tugas "${taskName}" ke dashboard ` +
+      `(HTTP ${httpStatus ?? "unknown"}). Silakan coba lagi atau buat tugas secara manual melalui halaman Tasks.`
+    );
+  }
+
+  // ── Success WITH WhatsApp notification ───────────────────────────────────
+  if (assigneePhone) {
+    const displayName = assigneeName ?? assigneePhone;
+    return (
+      `Selesai! ✅ Tugas **"${taskName}"** telah berhasil ditambahkan ke dashboard untuk **${deadlineStr}** ` +
+      `dan ditugaskan kepada **${displayName}**. ` +
+      `Notifikasi WhatsApp juga sudah dikirimkan ke nomor mereka (${assigneePhone}). ` +
+      `Ada lagi yang ingin kamu jadwalkan atau delegasikan?`
+    );
+  }
+
+  // ── Success WITHOUT WhatsApp (no phone given) ────────────────────────────
+  return (
+    `Saya sudah menambahkan tugas **"${taskName}"** ke dashboard untuk **${deadlineStr}**. ` +
+    `Karena tidak ada informasi kontak yang diberikan, notifikasi WhatsApp dilewati. ` +
+    `Apakah kamu ingin mendelegasikan tugas ini ke seseorang?`
+  );
+}
+
+// ─── Gemini Function Calling Tool Schema ─────────────────────────────────────
+//
+// The AI model uses this declaration to extract structured data from natural
+// language. E.g.: "buatkan jadwal meet besok untuk Mas Razan, nomornya 083804064832"
+// → task_name="Meet Besok", deadline="<tomorrow's date>", assignee_name="Mas Razan",
+//   assignee_phone="083804064832"
+//
+// Key notes for the model:
+//   - `deadline` must always be resolved to an absolute YYYY-MM-DD date.
+//     Relative expressions like "besok", "lusa", "minggu depan" must be
+//     calculated dynamically based on today's real date at call time.
+//   - `assignee_phone` must contain digits only (strip +, -, spaces, etc).
+//   - `assignee_name` and `assignee_phone` are optional; omit them if the
+//     user didn't provide an assignee.
 const createTaskTool: FunctionDeclarationsTool = {
   functionDeclarations: [
     {
       name: "create_task",
       description:
-        "Membuat task/tugas baru di dashboard user. Hanya panggil ini jika user SECARA EKSPLISIT " +
-        "meminta pembuatan tugas/jadwal baru di pesan mereka saat ini.",
+        "Membuat task / tugas baru di dashboard. Panggil HANYA jika user secara eksplisit " +
+        "meminta pembuatan tugas, jadwal, atau to-do baru di pesan mereka saat ini. " +
+        "Gunakan tanggal hari ini sebagai referensi untuk menghitung deadline relatif " +
+        `(hari ini = ${new Date().toISOString().slice(0, 10)}).`,
       parameters: {
         type: SchemaType.OBJECT,
         properties: {
-          title: {
+          task_name: {
             type: SchemaType.STRING,
-            description: "Judul tugas, singkat dan jelas",
+            description:
+              "Judul / nama tugas yang singkat dan jelas. " +
+              "Contoh: 'Meet Besok', 'Laporan Keuangan Q3', 'Review Proposal Mas Razan'.",
           },
-          description: {
+          deadline: {
             type: SchemaType.STRING,
-            description: "Deskripsi detail tugas",
+            description:
+              "Tanggal tenggat dalam format YYYY-MM-DD. " +
+              "Jika user menyebut tanggal relatif ('besok', 'lusa', 'minggu depan', 'Jumat'), " +
+              `hitung dari tanggal hari ini (${new Date().toISOString().slice(0, 10)}) ` +
+              "dan kembalikan hasilnya sebagai string YYYY-MM-DD.",
+          },
+          assignee_name: {
+            type: SchemaType.STRING,
+            description:
+              "Nama orang yang ditugaskan (opsional). " +
+              "Ekstrak dari pesan jika disebutkan, mis. 'Mas Razan', 'Bu Sari'.",
+          },
+          assignee_phone: {
+            type: SchemaType.STRING,
+            description:
+              "Nomor WhatsApp assignee, HANYA digit saja — hapus +, -, spasi, kurung. " +
+              "Contoh: user menulis '083804064832' atau '+62 838-040-64832' → kembalikan '083804064832'. " +
+              "Kosongkan jika user tidak menyebut nomor HP.",
           },
         },
-        required: ["title", "description"],
+        required: ["task_name", "deadline"],
       },
     },
   ],
@@ -321,42 +416,139 @@ export async function POST(req: NextRequest) {
     let reply = response.text() ?? "";
     const functionCalls = response.functionCalls?.() ?? [];
 
-    // ---- 5. Eksekusi tool call (kalau ada) -- hanya dari channel terstruktur ----
+    // Populated inside the taskCall branch; sent to frontend so it can
+    // call router.refresh() and re-render the task table automatically.
+    let taskCreated: {
+      id: string | null;
+      title: string;
+      formattedDeadline: string;
+      whatsappSent: boolean;
+    } | null = null;
+
+    // ── 5. Eksekusi tool call — dirutekan ke /api/tasks (Supabase + WhatsApp) ──
     const taskCall = functionCalls.find((c) => c.name === "create_task");
 
     if (taskCall) {
-      const args = taskCall.args as { title?: string; description?: string };
-      const title = (args.title ?? "").slice(0, 200).trim();
-      const description = (args.description ?? "").slice(0, 2000).trim();
+      // Destructure all four fields the model may have extracted
+      const args = taskCall.args as {
+        task_name?: string;
+        deadline?: string;
+        assignee_name?: string;
+        assignee_phone?: string;
+      };
 
-      if (title && user) {
-        const { error: insertError } = await supabase.from("tasks").insert([
-          {
-            title,
-            description: `${description} (Dibuat otomatis via Smart Chat Panel)`,
-            assignee_id: user.id,  // FK → auth.users.id (tidak ada kolom user_id)
-            status: "Todo",        // Harus cocok dengan nilai di UI: "Todo" | "In Progress" | "Done" | "Backlog"
-            workspace_id: null,    // nullable per skema, tidak ada workspace aktif dari context ini
-          },
-        ]);
+      const taskName     = (args.task_name     ?? "").slice(0, 200).trim();
+      const deadline     = (args.deadline       ?? "").trim();
+      const assigneeName = (args.assignee_name  ?? "").trim() || null;
+      // Strip any remaining non-digit characters the model may have missed
+      const assigneePhone =
+        (args.assignee_phone ?? "").replace(/\D/g, "") || null;
 
-        if (!insertError) {
-          reply += `\n\n✅ Tugas "${title}" berhasil dibuat di dashboard Anda.`;
-        } else {
-          console.error("[SUPABASE INSERT ERROR]", insertError);
-          reply += `\n\n⚠️ Maaf, gagal menyimpan tugas ke database.`;
-        }
-      } else if (title && !user) {
+      if (!taskName) {
+        // Model returned a tool call but forgot the required task_name — skip gracefully
+        console.warn("[TASK TOOL] create_task fired but task_name is empty — skipping insert.");
+        reply += `\n\n⚠️ Tidak dapat membuat tugas: nama tugas tidak ditemukan.`;
+      } else if (!user) {
         reply += `\n\n⚠️ Silakan login untuk membuat tugas otomatis.`;
+      } else {
+        // ── Internal POST to /api/tasks ────────────────────────────────────
+        // This route handles the Supabase insert AND fires the background
+        // WhatsApp notification via Green-API (fire-and-forget). We call it
+        // via HTTP so both responsibilities stay encapsulated in one place.
+        console.log(
+          `🚀 AI Agent triggered Task Creation & WhatsApp pipeline! ` +
+          `task="${taskName}", deadline="${deadline}", ` +
+          `assignee="${assigneeName ?? 'N/A'}", phone="${assigneePhone ?? 'N/A'}"`
+        );
+
+        try {
+          const origin =
+            process.env.NEXT_PUBLIC_APP_URL ??
+            (req.headers.get("origin") || "http://localhost:3000");
+
+          const tasksRes = await fetch(`${origin}/api/tasks`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              // Forward the user's auth token so /api/tasks can identify the caller
+              ...(req.headers.get("authorization")
+                ? { Authorization: req.headers.get("authorization")! }
+                : {}),
+            },
+            body: JSON.stringify({
+              title:          taskName,
+              description:    `Dibuat otomatis via Smart Chat Panel — deadline: ${deadline || "tidak disebutkan"}.`,
+              status:         "Todo",
+              assignee_id:    user.id,    // FK → auth.users.id
+              due_date:       deadline    || null,
+              workspace_id:   null,
+              // WhatsApp notification fields (skipped by /api/tasks if null)
+              assignee_name:  assigneeName,
+              assignee_phone: assigneePhone,
+            }),
+          });
+
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            console.log(
+              `✅ [TASK PIPELINE] Task "${taskName}" created successfully. ` +
+              `id=${tasksData?.task?.id ?? "unknown"}, ` +
+              `WhatsApp=${assigneePhone ? "queued" : "skipped"}`
+            );
+
+            // ── Build the human-like confirmation bubble ──────────────────
+            reply = buildTaskReply({
+              taskName,
+              deadline,
+              assigneeName,
+              assigneePhone,
+              success: true,
+            });
+
+            // Signal the frontend to refresh the task table
+            taskCreated = {
+              id:                tasksData?.task?.id ?? null,
+              title:             taskName,
+              formattedDeadline: formatDeadline(deadline),
+              whatsappSent:      !!assigneePhone,
+            };
+          } else {
+            const errData = await tasksRes.json().catch(() => ({}));
+            console.error(
+              `❌ [TASK PIPELINE] /api/tasks responded with HTTP ${tasksRes.status}:`,
+              errData
+            );
+            reply = buildTaskReply({
+              taskName,
+              deadline,
+              assigneeName,
+              assigneePhone,
+              success: false,
+              httpStatus: tasksRes.status,
+            });
+          }
+        } catch (fetchErr: unknown) {
+          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+          console.error("❌ [TASK PIPELINE] Internal fetch to /api/tasks failed:", msg);
+          reply = buildTaskReply({
+            taskName,
+            deadline,
+            assigneeName,
+            assigneePhone,
+            success: false,
+          });
+        }
       }
     }
 
-    // --- FIX #5: sertakan metadata debug ringan di response (opsional) ---
-    // Berguna untuk testing/QA seperti yang Anda lakukan -- supaya kelihatan
-    // berapa chunk yang di-retrieve dan apakah query terdeteksi agregasi,
-    // tanpa harus buka database manual tiap kali evaluasi RAG.
+    // --- Metadata debug ringan + taskCreated flag untuk frontend ---
+    // `taskCreated` non-null signals the chat UI to call router.refresh()
+    // so the task table reloads automatically alongside the chat bubble.
     return NextResponse.json({
       reply,
+      // Truthy when a task was just created via this request;
+      // the frontend uses this to trigger router.refresh().
+      taskCreated,
       debug: {
         retrievedChunks: retrievedCount,
         matchCountUsed: matchCount,

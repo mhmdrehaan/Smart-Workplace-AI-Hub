@@ -20,6 +20,34 @@ interface Props {
   currentRow: Task
 }
 
+/**
+ * Formats a raw database date string (e.g. "2026-07-15T00:00:00+00:00")
+ * into a readable calendar day like "Wednesday, July 15, 2026".
+ *
+ * Strategy: slice the first 10 chars to get "YYYY-MM-DD", then parse that
+ * clean string so `new Date()` never shifts the day due to UTC offset.
+ * Falls back to the raw string if the input can't be parsed.
+ */
+function formatDueDate(raw: string): string {
+  // Extract the date-only portion to avoid timezone shifting
+  const dateOnly = raw.trim().slice(0, 10)
+
+  // Basic sanity check: must look like YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return raw
+
+  // Append T12:00:00 (local noon) so Date() never wraps to the previous day
+  // regardless of the user's local timezone
+  const d = new Date(`${dateOnly}T12:00:00`)
+  if (isNaN(d.getTime())) return raw
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(d)
+}
+
 export function TasksDetailDialog({ open, onOpenChange, currentRow }: Props) {
   const status = statuses.find((status) => status.value === currentRow.status)
   return (
@@ -45,7 +73,9 @@ export function TasksDetailDialog({ open, onOpenChange, currentRow }: Props) {
           )}
           {currentRow.due_date && (
             <div className="text-muted-foreground">
-              <span className="text-sm">Due: {currentRow.due_date}</span>
+              <span className="text-sm">
+                Due: {formatDueDate(currentRow.due_date)}
+              </span>
             </div>
           )}
         </div>

@@ -60,11 +60,11 @@ export const sidebarData: SidebarData = {
           url: "/tasks", // disesuaikan ke folder tasks
           icon: Zap,
         },
-        {
-          title: "Team Members",
-          url: "/users", // disesuaikan ke folder users
-          icon: Users,
-        },
+        // {
+        //   title: "Team Members",
+        //   url: "/users", // disesuaikan ke folder users
+        //   icon: Users,
+        // },
       ],
     },
     {
